@@ -27,9 +27,18 @@ async function handleMessage({ message, store, whatsapp, crm, config }) {
   } else if (session.state === STATES.BUDGET && BUDGETS[message.buttonId]) {
     session.budget = BUDGETS[message.buttonId]; session.state = STATES.LOCATION; await askLocation(whatsapp, message.from);
   } else if (session.state === STATES.LOCATION && LOCATIONS[message.buttonId]) {
-    session.location = LOCATIONS[message.buttonId]; session.completedEventId = message.id;
-    await crm.submitLead(crmPayload(session, config));
-    session.state = STATES.COMPLETED; session.crmSubmitted = true;
+    session.location = LOCATIONS[message.buttonId];
+    session.completedEventId = message.id;
+
+    try {
+      await crm.submitLead(crmPayload(session, config));
+      session.crmSubmitted = true;
+    } catch (error) {
+      session.crmSubmitted = false;
+      console.error("CRM webhook unavailable:", error.message);
+    }
+
+    session.state = STATES.COMPLETED;
     await whatsapp.sendText(message.from, COMPLETE);
   } else { store.markProcessed(message.id); return { ignored: true }; }
   store.set(message.from, session); store.markProcessed(message.id);
